@@ -228,7 +228,7 @@ thread_sleep (int64_t wakeup_ticks)
 
   struct thread *t = thread_current ();
   t->wakeup_ticks = wakeup_ticks;
-  list_insert_ordered (&sleep_list, t->elem, less_wakeup_ticks, NULL);
+  list_insert_ordered (&sleep_list, &t->elem, less_wakeup_ticks, NULL);
   thread_block ();
 
   intr_set_level (old_level);
@@ -236,7 +236,7 @@ thread_sleep (int64_t wakeup_ticks)
 
 
 bool
-less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux)
+less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, UNUSED void *aux)
 {
   struct thread *t_a = list_entry (a, struct thread, elem);
   struct thread *t_b = list_entry (b, struct thread, elem);
@@ -247,8 +247,8 @@ less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *a
 void
 check_and_wakeup_sleep_threads (int64_t ticks)
 {
-  struct thread *t
-  for (int i=0; i < list_size (&sleep_list); i++) {
+  struct thread *t;
+  for (int i=0; i < (int) list_size (&sleep_list); i++) {
     t = list_entry (list_front (&sleep_list), struct thread, elem);
     if (t->wakeup_ticks > ticks) {
       break;
