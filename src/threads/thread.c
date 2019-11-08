@@ -241,6 +241,9 @@ less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, UNUSED 
   struct thread *t_a = list_entry (a, struct thread, elem);
   struct thread *t_b = list_entry (b, struct thread, elem);
 
+  if (t_a->wakeup_ticks == t_b->wakeup_ticks) {
+    return t_a->priority > t_b->priority;
+  }
   return t_a->wakeup_ticks < t_b->wakeup_ticks;
 }
 
