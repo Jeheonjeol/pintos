@@ -74,6 +74,7 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool highter_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
 
 /* Initializes the threading system by transforming the code
@@ -228,7 +229,19 @@ thread_sleep (int64_t wakeup_ticks)
 
   struct thread *t = thread_current ();
   t->wakeup_ticks = wakeup_ticks;
+
+      // printf ("thread_sleep:: [current t->name: %10s, wakeup_ticks=%3d]\n", t->name, wakeup_ticks);
+
   list_insert_ordered (&sleep_list, &t->elem, less_wakeup_ticks, NULL);
+
+    // struct thread *t2 = list_entry (list_front (&sleep_list), struct thread, elem);
+    // printf ("thread_sleep:: [idx=%3d] t2->name: %10s, t2->wakeup_ticks=%d\n", 0, t2->name, t2->wakeup_ticks);
+    // for (int j=1; j < (int) list_size (&sleep_list); j++)
+    // {
+    //   t2 = list_entry (list_next (&t2->elem), struct thread, elem);
+    //   printf ("thread_sleep:: [idx=%3d] t2->name: %10s, t2->wakeup_ticks=%d\n", j, t2->name, t2->wakeup_ticks);
+    // }
+
   thread_block ();
 
   intr_set_level (old_level);
@@ -241,27 +254,42 @@ less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, UNUSED 
   struct thread *t_a = list_entry (a, struct thread, elem);
   struct thread *t_b = list_entry (b, struct thread, elem);
 
-  if (t_a->wakeup_ticks == t_b->wakeup_ticks) {
-    return t_a->priority > t_b->priority;
-  }
   return t_a->wakeup_ticks < t_b->wakeup_ticks;
+}
+
+bool
+highter_priority (const struct list_elem *a, const struct list_elem *b, UNUSED void *aux)
+{
+  struct thread *t_a = list_entry (a, struct thread, elem);
+  struct thread *t_b = list_entry (b, struct thread, elem);
+
+  return t_a->priority > t_b->priority;
 }
 
 void
 check_and_wakeup_sleep_threads (int64_t ticks)
 {
   struct thread *t;
-  for (int i=0; i < (int) list_size (&sleep_list); i++) {
+  while (!list_empty (&sleep_list)) {
+  // for (int i=0; i < (int) list_size (&sleep_list); i++) 
+  // {
     t = list_entry (list_front (&sleep_list), struct thread, elem);
-    if (t->wakeup_ticks > ticks) {
-      break;
-    }
+    // printf ("wakeup_thread:: ticks: %3d, wakeup_ticks: %3d\n", ticks, t->wakeup_ticks);
+
+    if (t->wakeup_ticks > ticks) break;
+      // for (int j=0; j < (int) list_size (&sleep_list); j++)
+      // {
+      //   struct thread *t2 = list_entry (list_front (&sleep_list), struct thread, elem);
+      //   printf ("[ticks=%4d/ i=%4d / idx=%4d] t2.wakeup_ticks=%d\n", ticks, i, j, t2->wakeup_ticks);
+      // }
+      // printf ("wakeup_thread:: current ticks: %3d...\n", ticks);
+
+    // printf ("wakeup_thread:: [wakeup!! t->name: %10s, t->wakeup_ticks=%3d]\n", t->name, t->wakeup_ticks);
 
     list_pop_front (&sleep_list);
     thread_unblock (t);
   }
 }
-
 
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
@@ -296,7 +324,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, highter_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
