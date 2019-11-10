@@ -74,7 +74,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
 void check_and_change_running_thread_by_priority (void);
 
@@ -399,12 +398,33 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 void
+donate_priority (void)
+{
+  for (struct list_elem *e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if (t->semaphore != NULL && !list_empty (&t->semaphore->waiters))
+      {
+        int donation_priority = list_entry (list_front (&t->semaphore->waiters), struct thread, elem)->priority;
+        t->priority = t->original_priority > donation_priority ? t->original_priority : donation_priority;
+      }
+    }
+}
+
+void
 check_and_change_running_thread_by_priority (void)
 {
   if (thread_current () != idle_thread && !list_empty (&ready_list))
   {
+    enum intr_level old_level = intr_disable ();
+
+    donate_priority ();
+    list_sort (&ready_list, higher_priority, NULL);
+
     struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
     if (thread_current ()->priority < next->priority) thread_yield ();
+
+    intr_set_level (old_level);
   }
 }
 
@@ -541,6 +561,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
   list_push_back (&all_list, &t->allelem);
+
+  t->semaphore = NULL;
+  t->original_priority = priority;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
