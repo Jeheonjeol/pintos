@@ -24,6 +24,8 @@
    that are ready to run but not actually running. */
 static struct list ready_list;
 
+static struct list sleep_list;
+
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
@@ -71,6 +73,10 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
+bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+void check_and_wakeup_sleep_threads (int64_t ticks);
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -91,6 +97,7 @@ thread_init (void)
 
   lock_init (&tid_lock);
   list_init (&ready_list);
+  list_init (&sleep_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -120,8 +127,10 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (int64_t ticks)
 {
+  check_and_wakeup_sleep_threads (ticks);
+
   struct thread *t = thread_current ();
 
   /* Update statistics. */
@@ -212,6 +221,53 @@ thread_create (const char *name, int priority,
   return tid;
 }
 
+
+void
+thread_sleep (int64_t ticks)
+{
+  enum intr_level old_level = intr_disable ();
+
+  struct thread *t = thread_current ();
+  t->wakeup_ticks = ticks;
+  list_insert_ordered (&sleep_list, &t->elem, less_wakeup_ticks, NULL);
+  thread_block ();
+
+  intr_set_level (old_level);
+}
+
+
+bool
+less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, UNUSED void *aux)
+{
+  struct thread *t_a = list_entry (a, struct thread, elem);
+  struct thread *t_b = list_entry (b, struct thread, elem);
+
+  return t_a->wakeup_ticks < t_b->wakeup_ticks;
+}
+
+bool
+higher_priority (const struct list_elem *a, const struct list_elem *b, UNUSED void *aux)
+{
+  struct thread *t_a = list_entry (a, struct thread, elem);
+  struct thread *t_b = list_entry (b, struct thread, elem);
+
+  return t_a->priority > t_b->priority;
+}
+
+void
+check_and_wakeup_sleep_threads (int64_t ticks)
+{
+  struct thread *t;
+  while (!list_empty (&sleep_list)) 
+  {
+    t = list_entry (list_front (&sleep_list), struct thread, elem);
+    if (t->wakeup_ticks > ticks) break;
+
+    list_pop_front (&sleep_list);
+    thread_unblock (t);
+  }
+}
+
 /* Puts the current thread to sleep.  It will not be scheduled
    again until awoken by thread_unblock().
 
@@ -245,7 +301,7 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, higher_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -469,6 +525,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  t->wakeup_ticks = 0;
   list_push_back (&all_list, &t->allelem);
 }
 
