@@ -74,17 +74,9 @@ sema_down (struct semaphore *sema)
       thread_block ();
     }
 
-  list_insert (&cur->semaphore_list, &sema->elem);
+  list_push_back (&cur->semaphore_list, &sema->elem);
+  priorityDonation ();
 
-  struct list_elem *e;
-  struct semaphore *s;
-  for (e = list_begin (&cur->semaphore_list); e != list_end (&cur->semaphore_list); e = list_next (e))
-    {
-      s = list_entry (e, struct semaphore, elem);
-      int max_priority = list_entry (list_front (&s->waiters), struct thread, elem)->priority;
-      if (cur->priority < max_priority)
-        cur->priority = max_priority;
-    }
   sema->value--;
   intr_set_level (old_level);
 }
@@ -131,16 +123,7 @@ sema_up (struct semaphore *sema)
   struct thread *cur = thread_current ();
   cur->priority = cur->original_priority;
   list_remove (&sema->elem);
-
-  struct list_elem *e;
-  struct semaphore *s;
-  for (e = list_begin (&cur->semaphore_list); e != list_end (&cur->semaphore_list); e = list_next (e))
-    {
-      s = list_entry (e, struct semaphore, elem);
-      int max_priority = list_entry (list_front (&s->waiters), struct thread, elem)->priority;
-      if (cur->priority < max_priority)
-        cur->priority = max_priority;
-    }
+  priorityDonation ();
 
   if (!list_empty (&sema->waiters)) 
     thread_unblock (list_entry (list_pop_front (&sema->waiters),

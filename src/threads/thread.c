@@ -77,6 +77,30 @@ bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, vo
 void check_and_wakeup_sleep_threads (int64_t ticks);
 void check_and_change_running_thread_by_priority (void);
 
+void
+priorityDonation (void)
+{
+  enum intr_level old_level = intr_disable ();
+
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  struct semaphore *s;
+  int i = 0;
+  for (e = list_begin (&cur->semaphore_list); e != list_end (&cur->semaphore_list); e = list_next (e), i++)
+    {
+      printf ("JH, i=%3d, name=%10s\n", i, cur->name);
+      s = list_entry (e, struct semaphore, elem);
+      if (cur != idle_thread && !list_empty (&s->waiters))
+      {
+        int max_priority = list_entry (list_front (&s->waiters), struct thread, elem)->priority;
+        if (cur->priority < max_priority)
+          cur->priority = max_priority;
+      }
+    }
+
+  intr_set_level (old_level);
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
