@@ -75,7 +75,7 @@ sema_down (struct semaphore *sema)
     }
 
   list_push_back (&cur->semaphore_list, &sema->elem);
-  priorityDonation ();
+  donatePriority ();
 
   sema->value--;
   intr_set_level (old_level);
@@ -123,7 +123,7 @@ sema_up (struct semaphore *sema)
   struct thread *cur = thread_current ();
   cur->priority = cur->original_priority;
   list_remove (&sema->elem);
-  priorityDonation ();
+  donatePriority ();
 
   if (!list_empty (&sema->waiters)) 
     thread_unblock (list_entry (list_pop_front (&sema->waiters),

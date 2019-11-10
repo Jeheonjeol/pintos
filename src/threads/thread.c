@@ -78,11 +78,13 @@ void check_and_wakeup_sleep_threads (int64_t ticks);
 void check_and_change_running_thread_by_priority (void);
 
 void
-priorityDonation (void)
+donatePriority (void)
 {
+  struct thread *cur = thread_current ();
+  if (cur != idle_thread) return;
+
   enum intr_level old_level = intr_disable ();
 
-  struct thread *cur = thread_current ();
   struct list_elem *e;
   struct semaphore *s;
   int i = 0;
@@ -90,7 +92,7 @@ priorityDonation (void)
     {
       printf ("JH, i=%3d, name=%10s\n", i, cur->name);
       s = list_entry (e, struct semaphore, elem);
-      if (cur != idle_thread && !list_empty (&s->waiters))
+      if (!list_empty (&s->waiters))
       {
         int max_priority = list_entry (list_front (&s->waiters), struct thread, elem)->priority;
         if (cur->priority < max_priority)
