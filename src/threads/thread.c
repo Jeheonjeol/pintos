@@ -76,6 +76,7 @@ static tid_t allocate_tid (void);
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
+void check_and_change_running_thread_by_priority (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -304,6 +305,8 @@ thread_unblock (struct thread *t)
   list_insert_ordered (&ready_list, &t->elem, higher_priority, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
+
+  check_and_change_running_thread_by_priority ();
 }
 
 /* Returns the name of the running thread. */
@@ -372,7 +375,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, higher_priority, NULL);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -395,11 +398,22 @@ thread_foreach (thread_action_func *func, void *aux)
     }
 }
 
+void
+check_and_change_running_thread_by_priority (void)
+{
+  if (thread_current () != idle_thread && !list_empty (&ready_list))
+  {
+    struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
+    if (thread_current ()->priority < next->priority) thread_yield ();
+  }
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  check_and_change_running_thread_by_priority ();
 }
 
 /* Returns the current thread's priority. */
