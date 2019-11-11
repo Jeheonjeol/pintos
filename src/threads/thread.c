@@ -74,7 +74,6 @@ void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
-bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
 void check_and_change_running_thread_by_priority (void);
 
