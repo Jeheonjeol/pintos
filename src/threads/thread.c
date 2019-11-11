@@ -75,7 +75,6 @@ static tid_t allocate_tid (void);
 
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
-void check_and_change_running_thread_by_priority (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
