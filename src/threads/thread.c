@@ -399,16 +399,28 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 donate_priority (void)
 {
-  if (thread_current () == idle_thread) return;
-  if (list_empty (&ready_list)) return;
+  struct thread *cur = thread_current ();
+  if (cur == idle_thread) return;
 
   enum intr_level old_level = intr_disable ();
+
+  cur->priority = cur->original_priority;
+  if (cur->semaphore != NULL && !list_empty (&cur->semaphore->waiters))
+  {
+    int donation_priority = list_entry (list_front (&cur->semaphore->waiters), struct thread, elem)->priority;
+    if (cur->priority < donation_priority)
+    {
+      cur->priority = donation_priority;
+    }
+  }
 
   for (struct list_elem *e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
     {
       struct thread *t = list_entry (e, struct thread, allelem);
-      printf ("JH, donate_priority:: 1 START!! list_size (&ready_list): %8d\n", list_size (&ready_list));
-      printf ("JH, donate_priority:: 2 thread %8s, priority: %3d\n", t->name, t->priority);
+      if (t == idle_thread) continue;
+
+      // printf ("JH, donate_priority:: 1 START!! list_size (&ready_list): %8d\n", list_size (&ready_list));
+      // printf ("JH, donate_priority:: 2 thread %8s, priority: %3d\n", t->name, t->priority);
 
       t->priority = t->original_priority;
       if (t->semaphore != NULL && !list_empty (&t->semaphore->waiters))
@@ -418,7 +430,7 @@ donate_priority (void)
         {
           t->priority = donation_priority;
         }
-        printf ("JH, donate_priority:: 3 original_priority: %3d, donation_priority: %3d\n", t->original_priority, donation_priority);
+        // printf ("JH, donate_priority:: 3 original_priority: %3d, donation_priority: %3d\n", t->original_priority, donation_priority);
         
       }
     }
