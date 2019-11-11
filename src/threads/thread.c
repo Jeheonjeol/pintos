@@ -399,6 +399,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 donate_priority (void)
 {
+  if (thread_current () == idle_thread) return;
+  if (list_empty (&ready_list)) return;
+
   enum intr_level old_level = intr_disable ();
 
   for (struct list_elem *e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
@@ -406,11 +409,15 @@ donate_priority (void)
       struct thread *t = list_entry (e, struct thread, allelem);
       printf ("JH, donate_priority:: 1 START!! list_size (&ready_list): %8d\n", list_size (&ready_list));
       printf ("JH, donate_priority:: 2 thread %8s, priority: %3d\n", t->name, t->priority);
+
+      t->priority = t->original_priority;
       if (t->semaphore != NULL && !list_empty (&t->semaphore->waiters))
       {
         int donation_priority = list_entry (list_front (&t->semaphore->waiters), struct thread, elem)->priority;
-        t->priority = t->original_priority > donation_priority ? t->original_priority : donation_priority;
-
+        if (t->priority < donation_priority)
+        {
+          t->priority = donation_priority;
+        }
         printf ("JH, donate_priority:: 3 original_priority: %3d, donation_priority: %3d\n", t->original_priority, donation_priority);
         
       }
@@ -423,15 +430,16 @@ donate_priority (void)
 void
 check_and_change_running_thread_by_priority (void)
 {
-  if (thread_current () != idle_thread && !list_empty (&ready_list))
-  {
-    enum intr_level old_level = intr_disable ();
+  if (thread_current () == idle_thread) return;
+  if (list_empty (&ready_list)) return;
 
-    struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
-    if (thread_current ()->priority < next->priority) thread_yield ();
+  enum intr_level old_level = intr_disable ();
 
-    intr_set_level (old_level);
-  }
+  struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
+  if (thread_current ()->priority < next->priority)
+    thread_yield ();
+
+  intr_set_level (old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
