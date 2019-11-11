@@ -443,20 +443,21 @@ check_and_change_running_thread_by_priority (void)
   if (thread_current () == idle_thread) return;
   if (list_empty (&ready_list)) return;
 
-  enum intr_level old_level = intr_disable ();
-
   struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
   if (thread_current ()->priority < next->priority)
     thread_yield ();
-
-  intr_set_level (old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *cur = thread_current ();
+  cur->original_priority = new_priority;
+  if (cur->priority == cur->original_priority)
+    cur->priority = new_priority;
+
+  donate_priority ();
   check_and_change_running_thread_by_priority ();
 }
 
