@@ -145,6 +145,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+void donate_priority (void);
 void check_and_change_running_thread_by_priority (void);
 
 #endif /* threads/thread.h */
