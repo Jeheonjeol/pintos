@@ -75,7 +75,6 @@ static tid_t allocate_tid (void);
 
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
-void check_and_change_running_thread_by_priority (void);
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -398,13 +397,59 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 void
+donate_priority (void)
+{
+  struct thread *cur = thread_current ();
+  if (cur == idle_thread) return;
+
+  enum intr_level old_level = intr_disable ();
+
+  // cur->priority = cur->original_priority;
+  // if (cur->semaphore != NULL && !list_empty (&cur->semaphore->waiters))
+  // {
+  //   int donation_priority = list_entry (list_front (&cur->semaphore->waiters), struct thread, elem)->priority;
+  //   if (cur->priority < donation_priority)
+  //   {
+  //     cur->priority = donation_priority;
+  //   }
+  // }
+
+  for (struct list_elem *e = list_begin (&ready_list); e != list_end (&ready_list); e = list_next (e))
+    {
+      struct thread *t = list_entry (e, struct thread, allelem);
+      if (t == idle_thread) continue;
+
+      // printf ("JH, donate_priority:: 1 START!! list_size (&ready_list): %8d\n", list_size (&ready_list));
+      // printf ("JH, donate_priority:: 2 thread %8s, priority: %3d\n", t->name, t->priority);
+
+      if (t->semaphore != NULL && !list_empty (&t->semaphore->waiters))
+      {
+        int donation_priority = list_entry (list_front (&t->semaphore->waiters), struct thread, elem)->priority;
+        if (t->priority < donation_priority)
+        {
+          t->priority = donation_priority;
+        }
+        // printf ("JH, donate_priority:: 3 original_priority: %3d, donation_priority: %3d\n", t->original_priority, donation_priority);        
+      }
+    }
+
+  list_sort (&ready_list, higher_priority, NULL);
+  intr_set_level (old_level);
+}
+
+void
 check_and_change_running_thread_by_priority (void)
 {
-  if (thread_current () != idle_thread && !list_empty (&ready_list))
-  {
-    struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
-    if (thread_current ()->priority < next->priority) thread_yield ();
-  }
+  if (thread_current () == idle_thread) return;
+  if (list_empty (&ready_list)) return;
+
+  enum intr_level old_level = intr_disable ();
+
+  struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
+  if (thread_current ()->priority < next->priority)
+    thread_yield ();
+
+  intr_set_level (old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -540,6 +585,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
   list_push_back (&all_list, &t->allelem);
+
+  t->semaphore = NULL;
+  t->original_priority = priority;
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and

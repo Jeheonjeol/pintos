@@ -94,6 +94,9 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
+    struct semaphore *semaphore;
+    int original_priority;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -142,5 +145,7 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
+void donate_priority (void);
+void check_and_change_running_thread_by_priority (void);
 
 #endif /* threads/thread.h */
