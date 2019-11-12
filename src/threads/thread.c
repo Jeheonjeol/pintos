@@ -411,8 +411,34 @@ check_and_change_running_thread_by_priority (void)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *cur = thread_current ();
+  if (cur->priority < new_priority)
+  {
+    cur->priority = new_priority;
+  }
+  cur->original_priority = new_priority;
   check_and_change_running_thread_by_priority ();
+}
+
+void
+thread_donate_priority (struct thread *t)
+{
+  enum intr_level old_level = intr_disable ();
+  
+  int max_priority = t->original_priority;
+  for (struct list_elem *e = list_begin (&t->holding_sema_list); e != list_end (&t->holding_sema_list); e = list_next (e))
+    {
+      struct semaphore *sema = list_entry (e, struct semaphore, elem);
+      if (!list_empty (&sema->waiters))
+      {
+        int waiters_max_priority = list_entry (list_front (&sema->waiters), struct thread, elem)->priority;
+        if (max_priority < waiters_max_priority)
+          max_priority = waiters_max_priority;
+      }
+    }  
+  t->priority = max_priority;
+
+  intr_set_level (old_level);
 }
 
 /* Returns the current thread's priority. */
@@ -539,7 +565,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->priority = priority;
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
-  list_push_back (&all_list, &t->allelem);
+  t->original_priority = priority;
+  t->waiting_sema = NULL;
+  list_init (&t->holding_sema_list);
+  list_push_back (&all_list, &t->allelem);  
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
