@@ -436,9 +436,9 @@ void
 thread_donate_priority (struct thread *t, int priority)
 {
   t->priority = priority;
-  if (target == thread_current() && !list_empty (&ready_list)) {
+  if (t == thread_current() && !list_empty (&ready_list)) {
     struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
-    if (next != NULL && next->priority > new_priority) {
+    if (next != NULL && next->priority > priority) {
       thread_yield();
     }
   }
