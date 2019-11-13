@@ -218,12 +218,6 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  //TODO ?
-  if (priority > thread_current ()-> priority)
-  {
-    thread_yield ();
-  }
-
   return tid;
 }
 
@@ -306,9 +300,7 @@ thread_unblock (struct thread *t)
   list_insert_ordered (&ready_list, &t->elem, higher_priority, NULL);
   t->status = THREAD_READY;
 
-  if (thread_current () != idle_thread && thread_current ()->priority < t->priority)
-    thread_yield ();
-  // check_and_change_running_thread_by_priority ();
+  check_and_change_running_thread_by_priority ();
 
   intr_set_level (old_level);
 }
@@ -418,32 +410,18 @@ void
 thread_set_priority (int new_priority) 
 {
   struct thread *cur = thread_current ();
-  // TODO 여기 ref쪽 버그있는듯
-  cur->original_priority = new_priority;
-  if (cur->priority < new_priority)
+  if (cur->priority == cur->original_priority)
     cur->priority = new_priority;
+  cur->original_priority = new_priority;
 
-  if (!list_empty (&ready_list)) {
-    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
-    if (next != NULL && next->priority > new_priority) {
-      thread_yield();
-    }
-  }
-  // check_and_change_running_thread_by_priority ();
+  check_and_change_running_thread_by_priority ();
 }
 
 void
 thread_donate_priority (struct thread *t, int priority)
 {
   t->priority = priority;
-  if (t == thread_current() && !list_empty (&ready_list)) {
-    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
-    if (next != NULL && next->priority > priority) {
-      thread_yield();
-    }
-  }
-  // TODO 
-  // check_and_change_running_thread_by_priority ();
+  check_and_change_running_thread_by_priority ();
 }
 
 /* Returns the current thread's priority. */
