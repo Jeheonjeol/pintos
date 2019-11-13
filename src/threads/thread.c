@@ -129,8 +129,6 @@ thread_start (void)
 void
 thread_tick (int64_t ticks)
 {
-  check_and_wakeup_sleep_threads (ticks);
-
   struct thread *t = thread_current ();
 
   /* Update statistics. */
@@ -142,6 +140,8 @@ thread_tick (int64_t ticks)
 #endif
   else
     kernel_ticks++;
+
+  check_and_wakeup_sleep_threads (ticks);
 
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
@@ -218,6 +218,12 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  //TODO ?
+  if (priority > thread_current ()-> priority)
+  {
+    thread_yield ();
+  }
+
   return tid;
 }
 
@@ -225,14 +231,10 @@ thread_create (const char *name, int priority,
 void
 thread_sleep (int64_t ticks)
 {
-  enum intr_level old_level = intr_disable ();
-
   struct thread *t = thread_current ();
   t->wakeup_ticks = ticks;
   list_insert_ordered (&sleep_list, &t->elem, less_wakeup_ticks, NULL);
   thread_block ();
-
-  intr_set_level (old_level);
 }
 
 
@@ -303,7 +305,10 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list, &t->elem, higher_priority, NULL);
   t->status = THREAD_READY;
-  check_and_change_running_thread_by_priority ();
+
+  if (thread_current () != idle_thread && thread_current ()->priority < t->priority)
+    thread_yield ();
+  // check_and_change_running_thread_by_priority ();
 
   intr_set_level (old_level);
 }
@@ -413,18 +418,32 @@ void
 thread_set_priority (int new_priority) 
 {
   struct thread *cur = thread_current ();
+  // TODO 여기 ref쪽 버그있는듯
   cur->original_priority = new_priority;
   if (cur->priority < new_priority)
     cur->priority = new_priority;
 
-  check_and_change_running_thread_by_priority ();
+  if (!list_empty (&ready_list)) {
+    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+    if (next != NULL && next->priority > new_priority) {
+      thread_yield();
+    }
+  }
+  // check_and_change_running_thread_by_priority ();
 }
 
 void
 thread_donate_priority (struct thread *t, int priority)
 {
   t->priority = priority;
-  check_and_change_running_thread_by_priority ();
+  if (target == thread_current() && !list_empty (&ready_list)) {
+    struct thread *next = list_entry(list_begin(&ready_list), struct thread, elem);
+    if (next != NULL && next->priority > new_priority) {
+      thread_yield();
+    }
+  }
+  // TODO 
+  // check_and_change_running_thread_by_priority ();
 }
 
 /* Returns the current thread's priority. */
