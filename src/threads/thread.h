@@ -92,7 +92,6 @@ struct thread
     int64_t wakeup_ticks;
     int original_priority;
 
-    struct semaphore *waiting_sema;
     struct list holding_sema_list;
 
     /* Shared between thread.c and synch.c. */

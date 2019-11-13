@@ -76,11 +76,11 @@ sema_down (struct semaphore *sema)
       
       thread_block ();
     }
+  sema->value--;
 
   sema->holder = cur;
   list_push_back (&cur->holding_sema_list, &sema->elem);
 
-  sema->value--;
   intr_set_level (old_level);
 }
 
@@ -127,10 +127,10 @@ sema_up (struct semaphore *sema)
   list_remove (&sema->elem);
   thread_donate_priority (thread_current ());
 
+  sema->value++;
   if (!list_empty (&sema->waiters)) 
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
-  sema->value++;
   intr_set_level (old_level);
 }
 

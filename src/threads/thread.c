@@ -423,6 +423,8 @@ thread_set_priority (int new_priority)
 void
 thread_donate_priority (struct thread *t)
 {
+  if (thread_current () == idle_thread) return;
+
   enum intr_level old_level = intr_disable ();
   
   int max_priority = t->original_priority;
@@ -566,7 +568,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
   t->original_priority = priority;
-  t->waiting_sema = NULL;
   list_init (&t->holding_sema_list);
   list_push_back (&all_list, &t->allelem);  
 }
