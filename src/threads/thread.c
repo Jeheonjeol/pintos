@@ -303,9 +303,9 @@ thread_unblock (struct thread *t)
   ASSERT (t->status == THREAD_BLOCKED);
   list_insert_ordered (&ready_list, &t->elem, higher_priority, NULL);
   t->status = THREAD_READY;
-  intr_set_level (old_level);
-
   check_and_change_running_thread_by_priority ();
+
+  intr_set_level (old_level);
 }
 
 /* Returns the name of the running thread. */
@@ -400,10 +400,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 check_and_change_running_thread_by_priority (void)
 {
-  if (thread_current () != idle_thread && !list_empty (&ready_list))
+  struct thread *cur = thread_current ();
+  if (cur != idle_thread && !list_empty (&ready_list))
   {
     struct thread *next = list_entry (list_front (&ready_list), struct thread, elem);
-    if (thread_current ()->priority < next->priority) thread_yield ();
+    if (cur->priority < next->priority) thread_yield ();
   }
 }
 
@@ -411,7 +412,18 @@ check_and_change_running_thread_by_priority (void)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *cur = thread_current ();
+  cur->original_priority = new_priority;
+  if (cur->priority < new_priority)
+    cur->priority = new_priority;
+
+  check_and_change_running_thread_by_priority ();
+}
+
+void
+thread_donate_priority (struct thread *t, int priority)
+{
+  t->priority = priority;
   check_and_change_running_thread_by_priority ();
 }
 
@@ -537,8 +549,11 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->original_priority = priority;
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
+  t->waiting_lock = NULL;
+  list_init (&t->holding_locks);
   list_push_back (&all_list, &t->allelem);
 }
 
