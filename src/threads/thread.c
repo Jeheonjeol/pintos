@@ -73,6 +73,7 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool higher_priority (const struct list_elem *a, const struct list_elem *b, void *aux);
 bool less_wakeup_ticks (const struct list_elem *a, const struct list_elem *b, void *aux);
 void check_and_wakeup_sleep_threads (int64_t ticks);
 void check_and_change_running_thread_by_priority (void);
@@ -407,6 +408,15 @@ check_and_change_running_thread_by_priority (void)
   }
 }
 
+void
+thread_donate_priority (struct thread *t, int priority)
+{
+  t->priority = priority;
+  if (t == thread_current ()) {
+    check_and_change_running_thread_by_priority ();
+  }
+}
+
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) 
@@ -537,9 +547,13 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->original_priority = priority;
   t->magic = THREAD_MAGIC;
   t->wakeup_ticks = 0;
   list_push_back (&all_list, &t->allelem);
+  
+  t->waiting_lock = NULL;
+  list_init (&t->holding_locks);
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
